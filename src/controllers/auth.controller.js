@@ -107,6 +107,40 @@ const verifyOtp = async (req, res) => {
     }
 };
 
+// ─── RESEND OTP signUP ───────────────────────────────────
+const resendOtp = async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        const user = await prisma.user.findUnique({ where: { email } });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        if (user.isVerified) {
+            return res.status(400).json({ message: 'User already verified' });
+        }
+
+        // Generate new 6 digit OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
+
+        // Update user with new OTP
+        await prisma.user.update({
+            where: { email },
+            data: { otp, otpExpiry }
+        });
+
+        // Send OTP
+        await sendOtpEmail(email, otp);
+
+        res.json({ message: 'A new OTP has been sent to your email.' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
 // ─── LOGIN ────────────────────────────────────────
 const login = async (req, res) => {
     try {
@@ -168,7 +202,7 @@ const getProfile = async (req, res) => {
     res.json({ user: req.user });
 };
 
-module.exports = { register, verifyOtp, login, refreshToken, getProfile };
+module.exports = { register, verifyOtp, resendOtp, login, refreshToken, getProfile };
 
 
 // mbc === mcp
