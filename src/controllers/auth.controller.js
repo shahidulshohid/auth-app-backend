@@ -6,8 +6,10 @@ const { sendOtpEmail } = require('../utils/email');
 const prisma = new PrismaClient();
 
 // Token make helper function
-const generateToken = (userId) => {
-    return jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
+const generateTokens = (userId) => {
+    const accessToken = jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: '15m' });
+    const refreshToken = jwt.sign({ id: userId }, process.env.JWT_REFRESH_SECRET, { expiresIn: '7d' });
+    return { accessToken, refreshToken };
 };
 
 // ─── REGISTER ─────────────────────────────────────
@@ -90,12 +92,13 @@ const verifyOtp = async (req, res) => {
             }
         });
 
-        // Generate token
-        const token = generateToken(updatedUser.id);
+        // Generate tokens
+        const tokens = generateTokens(updatedUser.id);
 
         res.json({
             message: 'Email verified successfully',
-            token,
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
             user: { id: updatedUser.id, name: updatedUser.name, email: updatedUser.email },
         });
 
@@ -109,7 +112,7 @@ const login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // User খোঁজো
+        // User find
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user) {
             return res.status(401).json({ message: 'Invalid credentials' });
@@ -119,21 +122,43 @@ const login = async (req, res) => {
             return res.status(403).json({ message: 'Please verify your email before logging in' });
         }
 
-        // Password match করো
+        // Password match 
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
 
-        const token = generateToken(user.id);
+        const tokens = generateTokens(user.id);
 
         res.json({
             message: 'Login successful',
-            token,
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
             user: { id: user.id, name: user.name, email: user.email },
         });
     } catch (error) {
         res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+// ─── REFRESH TOKEN ────────────────────────────────
+const refreshToken = async (req, res) => {
+    try {
+        const { token } = req.body;
+        if (!token) return res.status(401).json({ message: 'Refresh token required' });
+
+        const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+        const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+
+        if (!user) return res.status(403).json({ message: 'Invalid refresh token' });
+
+        const tokens = generateTokens(user.id);
+        res.json({
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken
+        });
+    } catch (error) {
+        res.status(403).json({ message: 'Invalid or expired refresh token' });
     }
 };
 
@@ -143,4 +168,7 @@ const getProfile = async (req, res) => {
     res.json({ user: req.user });
 };
 
-module.exports = { register, verifyOtp, login, getProfile };
+module.exports = { register, verifyOtp, login, refreshToken, getProfile };
+
+
+// mbc === mcp
