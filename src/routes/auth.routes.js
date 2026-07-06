@@ -13,7 +13,7 @@ router.post('/verify-forgot-password-otp', verifyForgotPasswordOtp);
 router.post('/resend-otp/forgot-password', resendForgotPasswordOtp);
 router.post('/reset-password', resetPassword);
 router.post('/refresh-token', refreshToken);
-router.get('/profile', protect, getProfile); // protected route
 router.post('/change-password', protect, changePassword); // protected route
+router.get('/profile', protect, getProfile); // protected route
 
 module.exports = router;
