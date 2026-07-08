@@ -2,8 +2,10 @@ const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { sendOtpEmail } = require('../utils/email');
+const { OAuth2Client } = require('google-auth-library');
 
 const prisma = new PrismaClient();
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Token make helper function
 const generateTokens = (userId) => {
@@ -61,7 +63,7 @@ const verifyOtp = async (req, res) => {
         const { email, otp } = req.body;
 
         const user = await prisma.user.findUnique({ where: { email } });
-        
+
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
@@ -354,6 +356,70 @@ const changePassword = async (req, res) => {
     }
 };
 
-module.exports = { register, verifyOtp, resendOtp, login, forgotPassword, resetPassword, refreshToken, getProfile, verifyForgotPasswordOtp, resendForgotPasswordOtp, changePassword };
+// ─── GOOGLE LOGIN CALLBACK ──────────────────────
+// const googleLoginCallback = (req, res) => {
+//     try {
+//         const tokens = generateTokens(req.user.id);
+//         const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+//         // Redirect to frontend with tokens
+//         res.redirect(`${frontendUrl}/auth-success?accessToken=${tokens.accessToken}&refreshToken=${tokens.refreshToken}`);
+//     } catch (error) {
+//         res.status(500).json({ message: 'Server error', error: error.message });
+//     }
+// };
+// ─── GOOGLE LOGIN (Frontend Token Flow) ───────────
+const googleLogin = async (req, res) => {
+    try {
+        const { idToken } = req.body;
+        if (!idToken) {
+            return res.status(400).json({ message: 'idToken is required' });
+        }
+
+        const ticket = await googleClient.verifyIdToken({
+            idToken,
+            audience: process.env.GOOGLE_CLIENT_ID,
+        });
+
+        const payload = ticket.getPayload();
+        const { email, name, sub: googleId } = payload;
+
+        let user = await prisma.user.findUnique({ where: { email } });
+
+        if (user) {
+            if (!user.googleId) {
+                user = await prisma.user.update({
+                    where: { email },
+                    data: { googleId, isVerified: true }
+                });
+            }
+        } else {
+            user = await prisma.user.create({
+                data: {
+                    name,
+                    email,
+                    googleId,
+                    isVerified: true
+                }
+            });
+        }
+
+        const tokens = generateTokens(user.id);
+
+        res.json({
+            message: 'Google Login successful',
+            accessToken: tokens.accessToken,
+            refreshToken: tokens.refreshToken,
+            user: { id: user.id, name: user.name, email: user.email },
+        });
+
+    } catch (error) {
+        res.status(401).json({ message: 'Invalid Google Token', error: error.message });
+    }
+};
+
+module.exports = {
+    register, verifyOtp, resendOtp, login, forgotPassword, resetPassword, refreshToken, getProfile, verifyForgotPasswordOtp, resendForgotPasswordOtp, changePassword,
+    googleLogin,
+};
 
 

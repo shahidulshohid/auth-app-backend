@@ -1,0 +1,11 @@
+
+Node =============
+
+1*** I have to install for google login
+
+npm install passport passport-google-oauth20 express-session
+
+
+1*** For maigration
+
+npx prisma migrate dev --name google-oauth
