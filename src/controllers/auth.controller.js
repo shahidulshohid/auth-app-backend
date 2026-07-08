@@ -357,4 +357,3 @@ const changePassword = async (req, res) => {
 module.exports = { register, verifyOtp, resendOtp, login, forgotPassword, resetPassword, refreshToken, getProfile, verifyForgotPasswordOtp, resendForgotPasswordOtp, changePassword };
 
 
-// mbc === mcp
