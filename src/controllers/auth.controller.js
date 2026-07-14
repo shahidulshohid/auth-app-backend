@@ -393,12 +393,14 @@ const googleLogin = async (req, res) => {
                 });
             }
         } else {
+            const dummyPassword = await bcrypt.hash(Math.random().toString(36).slice(-10) + 'GoOgLe', 10);
             user = await prisma.user.create({
                 data: {
                     name,
                     email,
                     googleId,
-                    isVerified: true
+                    isVerified: true,
+                    password: dummyPassword
                 }
             });
         }
