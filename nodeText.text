@@ -2,10 +2,15 @@
 Node =============
 
 1*** I have to install for google login
-
 npm install passport passport-google-oauth20 express-session
 
 
-1*** For maigration
-
+2*** For maigration
 npx prisma migrate dev --name google-oauth
+
+3*** For cross 
+npm install cross
+
+
+4*** redirect url in google could
+http://localhost:3000/api/auth/google/callback
